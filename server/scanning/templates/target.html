@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>PlatForm扫描工具</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+
+  <!-- Bootstrap -->
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/bootstrap-checkbox.css" rel="stylesheet">
+  <link href="/static/css/fonts/font-awesome.min.css" rel="stylesheet">
+  <link href="/static/css/mytheme.css" rel="stylesheet">
+  <link href="/static/css/messagebox.css" rel="stylesheet">
+
+  <script src="/static/js/jquery-1.10.2.min.js"></script>
+  <script src="/static/js/bootstrap.min.js"></script>
+  <script src="/static/js/angular.min.js"></script>
+  <script src="/static/js/scanning.js"></script>
+  <script src="/static/js/minimal.min.js"></script>
+  <script src="/static/js/jquery.mmenu.min.js"></script>
+  <script src="/static/js/jquery.sparkline.min.js"></script>
+  <script src="/static/js/jquery.nicescroll.min.js"></script>
+
+  <script src="/static/js/messagebox/jquery-ui.min.js"></script>
+  <script src="/static/js/messagebox/plugins.js"></script>
+  <script src="/static/js/messagebox/actions.js"></script>
+
+  <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+  <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+  <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]-->
+  <style>
+    a.list-group-item i {
+      display: none
+    }
+
+    a.list-group-item:hover i {
+      display: block;
+    }
+  </style>
+
+</head>
+
+<body class="bg-7">
+
+  <!-- Wrap all page content here -->
+  <div id="wrap" ng-app="scantool" ng-controller="boxCtrl">
+
+    <!-- MESSAGE BOX confirm del target-->
+    <div class="message-box animated fadeIn" data-sound="alert" id="mb-confirm-deltarget">
+      <div class="mb-container">
+        <div class="mb-middle">
+          <div class="mb-title">
+            <span class="fa fa-sign-out"></span>
+            <strong>确定删除所选目标</strong> ?</div>
+          <div class="mb-content">
+          </div>
+          <div class="mb-footer">
+            <div class="pull-right">
+              <a href="#" class="btn btn-success btn-lg mb-control-close" ng-click='upDeleteTarget()'>确定</a>
+              <button class="btn btn-default btn-lg mb-control-close">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- END MESSAGE BOX confirm-->
+
+
+
+    <!-- MESSAGE BOX confirm del ipfile-->
+    <div class="message-box animated fadeIn" data-sound="alert" id="mb-confirm-delipfile">
+      <div class="mb-container">
+        <div class="mb-middle">
+          <div class="mb-title">
+            <span class="fa fa-sign-out"></span>
+            <strong>确定删除所选ip文件</strong> ?</div>
+          <div class="mb-content">
+          </div>
+          <div class="mb-footer">
+            <div class="pull-right">
+              <a href="#" class="btn btn-success btn-lg mb-control-close" ng-click='upDeleteIpFile()'>确定</a>
+              <button class="btn btn-default btn-lg mb-control-close">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- END MESSAGE BOX confirm-->
+
+
+    <!-- Make page fluid -->
+    <div class="row">
+
+
+
+
+
+      <!-- Fixed navbar -->
+      <div class="navbar navbar-default navbar-fixed-top navbar-transparent-black mm-fixed-top" role="navigation" id="navbar">
+
+
+
+        <!-- Branding -->
+        <div class="navbar-header col-md-2">
+          <a class="navbar-brand" href="#">
+            <strong>PlatForm扫描工具</strong>
+          </a>
+          <div class="sidebar-collapse">
+            <a href="#">
+              <i class="fa fa-bars"></i>
+            </a>
+          </div>
+        </div>
+        <!-- Branding end -->
+
+
+
+        <!-- .nav-collapse -->
+        <div class="navbar-collapse">
+
+          <!-- Page refresh -->
+          <ul class="nav navbar-nav refresh">
+            <li class="divided">
+              <a href="#" class="page-refresh">
+                <i class="fa fa-refresh"></i>
+              </a>
+            </li>
+          </ul>
+          <!-- /Page refresh -->
+          <ul class="nav navbar-nav quick-actions">
+            <li class="dropdown divided user" id="current-user">
+
+              <a class="dropdown-toggle options" data-toggle="dropdown" href="#">
+                <span ng-bind='logUser'></span>
+                <i class="fa fa-caret-down"></i>
+              </a>
+
+              <ul class="dropdown-menu arrow settings" style="left:-70px">
+
+                <li>
+
+                  <h3>更换背景:</h3>
+                  <ul id="color-schemes">
+                    <li>
+                      <a href="#" class="bg-1"></a>
+                    </li>
+                    <li>
+                      <a href="#" class="bg-2"></a>
+                    </li>
+                    <li>
+                      <a href="#" class="bg-3"></a>
+                    </li>
+                    <li>
+                      <a href="#" class="bg-4"></a>
+                    </li>
+                    <li>
+                      <a href="#" class="bg-5"></a>
+                    </li>
+                    <li>
+                      <a href="#" class="bg-6"></a>
+                    </li>
+                  </ul>
+
+                </li>
+
+                <li class="divider"></li>
+
+                <li>
+                  <a href="#">
+                    <i class="fa fa-user"></i>帐户信息</a>
+                </li>
+
+                <li>
+                  <a href="#" class="mb-control" data-box="#mb-signout">
+                    <span class="fa fa-sign-out">退出帐户</span>
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <li>
+              <a href="#">
+                <i class="fa fa-user"></i>
+              </a>
+            </li>
+
+          </ul>
+
+
+          <!-- Sidebar -->
+          <ul class="nav navbar-nav side-nav" id="sidebar">
+
+            <li class="navigation" id="navigation">
+              <a href="#" class="sidebar-toggle" data-toggle="#navigation">导航栏
+                <i class="fa fa-angle-up"></i>
+              </a>
+
+              <ul class="menu">
+
+
+                <li class="dropdown open active">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-list"></i>&ensp;扫描任务
+                    <b class="fa fa-plus dropdown-plus"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a href="/scanning/index">
+                        <i class="fa fa-caret-right"></i>发布新任务</a>
+                    </li>
+                    <li class='active'>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i> 目标管理</a>
+                    </li>
+                    <li>
+                      <a href="/scanning/pluginSetting">
+                        <i class="fa fa-caret-right"></i>插件管理</a>
+                    </li>
+                    <li>
+                      <a href="/scanning/task">
+                        <i class="fa fa-caret-right"></i>任务管理</a>
+                    </li>
+                  </ul>
+                </li>
+                <li class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-bar-chart-o"></i>&ensp;结果展示
+                    <b class="fa fa-plus dropdown-plus"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>所有结果</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>统计图</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>结果查询</a>
+                    </li>
+                  </ul>
+                </li>
+                <li class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-desktop"></i>&ensp;设置选项
+                    <b class="fa fa-plus dropdown-plus"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>扫描设置</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>查询设置</a>
+                    </li>
+                  </ul>
+                </li>
+                <li class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-tachometer"></i>&ensp;帐户
+                    <b class="fa fa-plus dropdown-plus"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>设置</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>更换帐户</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>退出</a>
+                    </li>
+                  </ul>
+                </li>
+                <li class="dropdown">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-play-circle"></i>&ensp;关于
+                    <b class="fa fa-plus dropdown-plus"></b>
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>帮助</a>
+                    </li>
+                    <li>
+                      <a href="#">
+                        <i class="fa fa-caret-right"></i>介绍</a>
+                    </li>
+                  </ul>
+                </li>
+
+
+
+
+              </ul>
+
+            </li>
+
+
+
+
+
+          </ul>
+          <!-- Sidebar end -->
+
+
+
+
+
+        </div>
+        <!--/.nav-collapse -->
+
+
+
+
+
+      </div>
+      <!-- Fixed navbar end -->
+
+
+
+
+
+
+      <!-- Page content -->
+      <div id="content" class="col-md-12">
+
+
+
+
+
+
+
+
+
+        <!-- page header -->
+        <div class="pageheader">
+
+
+        </div>
+        <!-- /page header -->
+
+
+
+
+
+
+        <!-- content main container -->
+
+
+        <div class="col-md-4">
+
+
+          <section class="tile color transparent-white">
+            <!-- tile header -->
+            <div class="tile-header">
+              <h1>
+                <strong>上传ip地址文件</strong>
+              </h1>
+
+            </div>
+            <!-- /tile header -->
+
+            <!-- tile body -->
+            <div class="tile-body">
+              <form class="form-horizontal" role="form" enctype="multipart/form-data" action="/data/uploadFileIP/" method="post">
+                <div class="form-group">
+                  <div class="col-sm-1"></div>
+                  <div class="col-sm-10">
+                    <input type="file" name="myfile" />
+                    <input type="submit" class="btn btn-greensea" value="upload" />
+                  </div>
+                </div>
+              </form>
+
+            </div>
+            <!-- /tile body -->
+          </section>
+
+
+
+        </div>
+
+        <div class='col-md-4'>
+
+
+          <section class="tile color transparent-black">
+            <div class="tile-header">
+              <h1>
+                <strong>Ip地址文件列表</strong>
+              </h1>
+
+            </div>
+            <div class="tile-body">
+              <div class="list-group">
+                <a href="#" class="list-group-item" ng-repeat='ipfile in ipFiles'>
+                  <i class='fa fa-trash-o pull-right ' ng-click='openDelIpFileConfirmMessageBox(ipfile.name)' style='font-size:24px; color:red'></i>
+                  <h4 class="list-group-item-heading" ng-bind='ipfile.name'></h4>
+
+                </a>
+
+              </div>
+            </div>
+          </section>
+        </div>
+
+
+
+      </div>
+    </div>
+    <!-- /content container -->
+
+
+
+
+
+
+  </div>
+  <!-- Page content end -->
+
+
+
+
+
+
+
+
+  <!-- MESSAGE BOX signout    -->
+  <div class="message-box animated fadeIn" data-sound="alert" id="mb-signout">
+    <div class="mb-container">
+      <div class="mb-middle">
+        <div class="mb-title">
+          <span class="fa fa-sign-out"></span>
+          <strong>退出当前帐户</strong> ?</div>
+        <div class="mb-content">
+          <p>您确定要退出么？</p>
+          <p>如果您想继续工作请按取消。如果确定退出请按退出。</p>
+
+        </div>
+        <div class="mb-footer">
+          <div class="pull-right">
+            <a href="/scanning/logout" class="btn btn-success btn-lg">退出</a>
+            <button class="btn btn-default btn-lg mb-control-close">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- END MESSAGE BOX  signout-->
+
+  <!-- MESSAGE BOX confirm new target-->
+  <div class="message-box animated fadeIn" data-sound="alert" id="mb-confirm-newtarget">
+    <div class="mb-container">
+      <div class="mb-middle">
+        <div class="mb-title">
+          <span class="fa fa-check-square-o"></span> 成功新建目标！</div>
+        <div class="mb-content">
+
+        </div>
+        <div class="mb-footer">
+          <div class="pull-right">
+            <a href="#" class="btn btn-success btn-lg mb-control-close">Yes</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- END MESSAGE BOX confirm new task-->
+
+
+
+
+  <!-- START PRELOADS -->
+  <audio id="audio-alert" src="/static/audio/alert.mp3" preload="auto"></audio>
+  <audio id="audio-fail" src="/static/audio/fail.mp3" preload="auto"></audio>
+  <!-- END PRELOADS -->
+
+
+  </div>
+  <!-- Make page fluid-->
+
+
+
+
+
+
+  </div>
+  <!-- Wrap all page content end -->
+
+
+
+</body>
+
+</html>
