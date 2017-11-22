@@ -24,13 +24,6 @@ class dboperator(object):
 
         self.__con = sqlite3.connect(dbfile)
         self.__cur = self.__con.cursor()
-
-    def __del__(self):
-        '''析构函数'''
-        self.__cur.close()
-        self.__con.close()
-
-    def createTables(self):
         self.__cur.execute(
             "create table if not exists " + self.__tableName + " (" +
             "id text primary key, " +
@@ -47,6 +40,11 @@ class dboperator(object):
             "id text primary key, " +
             "lastip integer)")
 
+    def __del__(self):
+        '''析构函数'''
+        self.__cur.close()
+        self.__con.close()
+
     def insertTask(self, id, ipRange, plugin, ipTotal):
         '''新建一条记录'''
         # 依次插入字段，startTime、endTime为空，ipFinished为0,status为未完成，instruciton为执行，其它为参数
@@ -54,6 +52,12 @@ class dboperator(object):
             "insert into " + self.__tableName + "(id,ipRange,plugin,ipTotal,ipFinished,status,instruction) values('" +
             id + "','" + ipRange + "','" + plugin + "'," + str(ipTotal) + ",0," + str(statusOptions["未完成"]) +
             "," + str(instructionOptions['执行']) + ")")
+        self.__con.commit()
+
+    def updateLastIp(self, id, lastip):
+        self.__cur.execute(
+            "insert into " + self.__tableName_lastIp + "(id,lastip) values('" +
+            id + "'," + str(lastip) + ") on duplicate key update lastip=" + str(lastip))
         self.__con.commit()
 
     def isExistById(self, id):
