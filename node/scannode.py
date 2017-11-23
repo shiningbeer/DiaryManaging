@@ -114,8 +114,7 @@ def func(dbpath, inteval, step, printed):
             inteval, func, (dbpath, inteval, step, printed))
         timer.start()
     else:
-        nodeTaskId = task[dbo.indexOfId]
-        plugin = task[dbo.indexOfPlugin]
+        nodeTaskId, plugin, ipranges_str, iptotal = task  # 获取task各字段（task是个元组）
         # 把后缀名.py去掉
         plugin = plugin[0:len(plugin) - 3]
         try:
@@ -128,7 +127,7 @@ def func(dbpath, inteval, step, printed):
             timer.start()
         printed = False
         logging.info("开始任务%s" % (nodeTaskId))
-        ipranges = eval(task[dbo.indexOfIpRange])  # 获取ip集
+        ipranges = eval(ipranges_str)  # 获取ip集
         lastip = dbo.getLastIpById(nodeTaskId)  # 加载执行进度
 
         # 计算需要扫描的ip集,已经扫描的个数
@@ -145,7 +144,7 @@ def func(dbpath, inteval, step, printed):
                 if stepcounter == step:
                     dbo.updateLastIpById(nodeTaskId, str(IP(i)))  # 保存执行进度
                     dbo.updateIpFinishedById(nodeTaskId, ipOkCount)
-                    print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(task[dbo.indexOfIpTotal]) + '\r',
+                    print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(iptotal) + '\r',
                     sys.stdout.flush()
                     stepcounter = 0
                     # 查看任务的指令是否变化
@@ -233,7 +232,7 @@ class scanNode(object):
         except:
             logging.info(u'本地未找到id.txt，向服务器注册节点。')
             nodeId = self.register()
-            if nodeid == None:
+            if nodeId == None:
                 return None
 
             f = open('id.txt', 'w')
@@ -311,5 +310,5 @@ class scanNode(object):
 if __name__ == '__main__':
     node = scanNode()
     node.loadConfig()
-    # node.pulse()
+    node.pulse()
     node.doTask()

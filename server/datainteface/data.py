@@ -87,6 +87,7 @@ def upStartTask(req):
         sum = 0
         # dispatchedList里面的元素是个字典，计算一下分配给这个node的ip数
         for item in dispatchedList[i]:
+            print item
             sum = sum + item['count']
             ip_range.append(item['range'])
         ip_total = sum

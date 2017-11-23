@@ -44,7 +44,7 @@ def IpDispatch(list_IpRange, splitNum):
             # eachPiece['startIP'] = str(IP(intStart + i * eachVolume))
             # eachPiece['endIP'] = str(IP(intStart + (i + 1) * eachVolume - 1))
             eachPiece['count'] = eachVolume
-            eachPiece = str(IP(intStart + i * eachVolume)) + \
+            eachPiece['range'] = str(IP(intStart + i * eachVolume)) + \
                 '-' + str(IP(intStart + (i + 1) * eachVolume - 1))
 
             dispatch_result_for_this_ipRange.append(eachPiece)

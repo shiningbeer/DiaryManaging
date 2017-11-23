@@ -14,13 +14,6 @@ class dboperator(object):
         # 常量定义
         self.__tableName = 'bbasks'
         self.__tableName_lastIp = "lastIP"
-        self.indexOfIpTotal = 5
-        self.indexOfIpFinished = 6
-        self.indexOfStatus = 7
-        self.indexOfInstruction = 8
-        self.indexOfPlugin = 2
-        self.indexOfId = 0
-        self.indexOfIpRange = 1
 
         self.__con = sqlite3.connect(dbfile)
         self.__cur = self.__con.cursor()
@@ -69,16 +62,23 @@ class dboperator(object):
         return result
 
     def isExistById(self, id):
-        self.__cur.execute("select * from " +
+        self.__cur.execute("select id from " +
                            self.__tableName + " where id='" + id + "'")
         if self.__cur.fetchone() != None:
             return True
         else:
             return False
 
+    def getIpFinishedFromUnfinishedTasks(self):
+        self.__cur.execute("select id,ipFinished from " +
+                           self.__tableName + " where status=" +
+                           str(statusOptions["未完成"]) + " and instruction!=" +
+                           str(instructionOptions["删除"]))
+        return self.__cur.fetchall()
+
     def getOneTaskForExecute(self):
         '''获取一条status="未完成"且instruction="执行"的记录'''
-        self.__cur.execute("select * from " +
+        self.__cur.execute("select id, plugin,ipRange,ipTotal from " +
                            self.__tableName + " where status=" +
                            str(statusOptions["未完成"]) + " and instruction=" +
                            str(instructionOptions["执行"]))
@@ -86,15 +86,15 @@ class dboperator(object):
 
     def getIpLeftAll(self):
         '''获取所有status="未完成"的iptotal和ipfinished之差'''
-        self.__cur.execute("select * from " +
+        self.__cur.execute("select ipTotal,ipFinished from " +
                            self.__tableName + " where status=" + str(statusOptions["未完成"]))
         result = 0
         nextRow = True
         while nextRow:
             row = self.__cur.fetchone()
             if row:
-                ipleft = row[self.indexOfIpTotal] -\
-                    row[self.indexOfIpFinished]
+                iptotal, ipfinished = row
+                ipleft = iptotal - ipfinished
                 result = result + ipleft
             else:
                 nextRow = False
@@ -102,11 +102,11 @@ class dboperator(object):
 
     def getInstructionById(self, id):
         ''' 获取某id的status '''
-        self.__cur.execute("select * from " + self.__tableName +
+        self.__cur.execute("select instruction from " + self.__tableName +
                            " where id='" + id + "'")
         result = self.__cur.fetchone()
         if result:
-            return result[self.indexOfInstruction]
+            return result[0]  # result居然还是个元组(xx,)
         else:
             return None
 
