@@ -38,7 +38,7 @@ class dboperator(object):
         self.__cur.execute(
             "create table if not exists " + self.__tableName_lastIp + " (" +
             "id text primary key, " +
-            "lastip integer)")
+            "lastip text)")
 
     def __del__(self):
         '''析构函数'''
@@ -54,11 +54,19 @@ class dboperator(object):
             "," + str(instructionOptions['执行']) + ")")
         self.__con.commit()
 
-    def updateLastIp(self, id, lastip):
-        self.__cur.execute(
-            "insert into " + self.__tableName_lastIp + "(id,lastip) values('" +
-            id + "'," + str(lastip) + ") on duplicate key update lastip=" + str(lastip))
+    def updateLastIpById(self, id, lastip):
+        sql = "replace into " + self.__tableName_lastIp + \
+            "(id,lastip) values('" + id + "','" + lastip + "')"
+        self.__cur.execute(sql)
         self.__con.commit()
+
+    def getLastIpById(self, id):
+        self.__cur.execute("select lastip from " +
+                           self.__tableName_lastIp + " where id='" + id + "'")
+        result = self.__cur.fetchone()
+        if result != None:
+            result = result[0]
+        return result
 
     def isExistById(self, id):
         self.__cur.execute("select * from " +
@@ -85,7 +93,7 @@ class dboperator(object):
         while nextRow:
             row = self.__cur.fetchone()
             if row:
-                ipleft = row[self.indexOfIpTotal] - \
+                ipleft = row[self.indexOfIpTotal] -\
                     row[self.indexOfIpFinished]
                 result = result + ipleft
             else:
@@ -140,4 +148,13 @@ class dboperator(object):
     def getAllTasks(self):
         self.__cur.execute("select * from " +
                            self.__tableName)
+        return self.__cur.fetchall()
+
+    def deleteTableLastip(self):
+        self.__cur.execute("drop table " + self.__tableName_lastIp)
+        self.__con.commit()
+
+    def getAllFromLastIp(self):
+        self.__cur.execute("select * from " +
+                           self.__tableName_lastIp)
         return self.__cur.fetchall()

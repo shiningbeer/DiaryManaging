@@ -1,2 +1,7 @@
+import sys
+from time import sleep
+
+
 def scan(ip):
-    print ip
+
+    sleep(1)

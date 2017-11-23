@@ -21,7 +21,7 @@ class Const(object):
         self.o_id = '_id'
         self.name = 'name'
         self.ipFiles = 'ipFiles'
-        self.user = 'user'0
+        self.user = 'user'
         self.description = 'description'
         self.plugin = 'plugin'
         self.pubTime = 'pubTime'

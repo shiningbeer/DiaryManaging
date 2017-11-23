@@ -43,6 +43,7 @@ def pulse(req):
     #     '5a1429db5919ba5b98435f08', statusOptions['未开始'])
     if dao.getOneNode_by_nodeID(nodeID) != None:
         dao.modiNode_pulse_by_nodeID(nodeID)
+        dao.modiNode_ipLeft_by_nodeID(nodeID, ipLeft)
         unfetchedTasks = dao.getNodeTasks_unfetched_by_nodeID(nodeID)
         if len(unfetchedTasks) == 0:
             return HttpResponse("no task now!")

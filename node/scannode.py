@@ -6,8 +6,7 @@ import json
 import datetime
 import sys
 import threading
-from dbOperator import dboperator
-from dbOperator import statusOptions
+from dbOperator import dboperator, statusOptions, instructionOptions
 import logging
 from IPy import IP
 # 设置默认的level为DEBUG
@@ -52,7 +51,6 @@ const = Const()
 
 def iptransformer(iprange):
     # 获取头尾ip
-    print iprange
     split = iprange.split('-')
     ipstart = split[0]
     ipend = split[1]
@@ -63,25 +61,62 @@ def iptransformer(iprange):
     return intStart, intEnd
 
 
-def func(dbpath, inteval, step, msg):
+def caculateScaningIpRange(ipranges, lastip):
+    '''
+    根据提供的ipranges列表和上次扫描到的ip，计算出新的扫描ip列表，已经扫描的个数
+    '''
+
+    theWholeRange = []
+    ipOkCount = 0
+    for iprange in ipranges:
+        start, end = iptransformer(iprange)
+        theWholeRange.append((start, end))
+    if lastip == None:  # 如果没有lastip，说明是全新任务，返回全部ip
+        return theWholeRange, ipOkCount
+    else:  # 已有进度
+        int_lastip = IP(lastip).int() + 1
+        ipRangesForScan = []
+        for iprange in theWholeRange:
+            start, end = iprange
+            if int_lastip not in range(start, end + 1):
+                ipOkCount = ipOkCount + end + 1 - start
+                continue
+            else:
+                ipRangeForscan = (int_lastip, end)
+                ipRangesForScan.append(ipRangeForscan)
+                ipOkCount = ipOkCount + int_lastip - start
+                continue
+            ipRangesForScan.append((start, end))
+            ipOkCount = ipOkCount + end + 1 - start
+        # 如果整个ipranges都找不到lastip，则不知道出了什么错，但不能返回空集，返回整个ipranges
+        if len(ipRangesForScan) == 0:
+            return theWholeRange, 0
+        # 找到lastip，返回子集
+        return ipRangesForScan, ipOkCount
+
+
+def func(dbpath, inteval, step, printed):
     '''
     任务执行线程函数，参数说明
     dppath:数据库路径
     inteval:定时器间隔
     step：多少个ip扫描完记录一次进度
-    msg:用于控制不重复输出
+    printed:上次是否打印了no task信息，bool值
     '''
     dbo = dboperator(dbpath)
     task = dbo.getOneTaskForExecute()
     if task == None:
-        if msg != '目前无可执行任务。':
+        if printed != True:
             logging.info('目前无可执行任务。')
-            msg = '目前无可执行任务。'
+            printed = True
         # 等一等 再执行
-        timer = threading.Timer(inteval, func, (dbpath, inteval, step, msg))
+        timer = threading.Timer(
+            inteval, func, (dbpath, inteval, step, printed))
         timer.start()
     else:
+        nodeTaskId = task[dbo.indexOfId]
         plugin = task[dbo.indexOfPlugin]
+        # 把后缀名.py去掉
         plugin = plugin[0:len(plugin) - 3]
         try:
             exec("from plugin import " + plugin + " as scanning_plugin")
@@ -89,26 +124,47 @@ def func(dbpath, inteval, step, msg):
             logging.info(u'未找到相应插件。')
             # 等一等 再执行
             timer = threading.Timer(
-                inteval, func, (dbpath, inteval, step, msg))
+                inteval, func, (dbpath, inteval, step, printed))
             timer.start()
-        msg = '有任务了'
-        logging.info("开始任务%s" % (task[dbo.indexOfId]))
-        ipranges = eval(task[dbo.indexOfIpRange])
-        stepcounter = 0  # 每满step个存储一次进度
-        for iprange in ipranges:
-            print iprange
-            start, end = iptransformer(iprange)
-            for i in range(start, end + 1):
-                # 计数，到step个时，存储扫描到哪里
-                stepcounter = stepcounter + 1
-                if stepcounter == step:
+        printed = False
+        logging.info("开始任务%s" % (nodeTaskId))
+        ipranges = eval(task[dbo.indexOfIpRange])  # 获取ip集
+        lastip = dbo.getLastIpById(nodeTaskId)  # 加载执行进度
 
+        # 计算需要扫描的ip集,已经扫描的个数
+        ipRangesForScan, ipOkCount = caculateScaningIpRange(
+            ipranges, lastip)
+        stepcounter = 0  # 每满step个存储一次进度
+        for iprange in ipRangesForScan:
+            start, end = iprange
+            for i in range(start, end + 1):
+                # 计数，到step个时，存储扫描到哪里,扫描了几个
+                stepcounter = stepcounter + 1
+                ipOkCount = ipOkCount + 1
+                scanning_plugin.scan(str(IP(i)))
+                if stepcounter == step:
+                    dbo.updateLastIpById(nodeTaskId, str(IP(i)))  # 保存执行进度
+                    dbo.updateIpFinishedById(nodeTaskId, ipOkCount)
+                    print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(task[dbo.indexOfIpTotal]) + '\r',
+                    sys.stdout.flush()
                     stepcounter = 0
-                scanning_plugin.scan("hahaha")
-        dbo.updateStatusById(task[dbo.indexOfId], statusOptions['完成'])
-        logging.info("完成任务%s" % (task[dbo.indexOfId]))
+                    # 查看任务的指令是否变化
+                    newInstruction = dbo.getInstructionById(nodeTaskId)
+                    # 如果指令不是执行
+                    if newInstruction != instructionOptions['执行']:
+                        # 等1秒 再执行
+                        timer = threading.Timer(
+                            1, func, (dbpath, inteval, step, printed))
+                        timer.start()
+                        # 本次任务退出
+                        return
+
+        dbo.updateStatusById(nodeTaskId, statusOptions['完成'])
+        # todo:删除lastip表中的这个id记录，因为已经完成了
+        logging.info("完成任务%s" % (nodeTaskId))
         # 完成一个后，直接执行下一个
-        timer = threading.Timer(0, func, (dbpath, inteval, step, msg))
+        timer = threading.Timer(
+            0, func, (dbpath, inteval, step, printed))
         timer.start()
 
 
@@ -124,23 +180,26 @@ class scanNode(object):
         self.PLUGINDIR = 'plugin/'
         self.PULSE_INTEVAL = 10
         self.DOTASK_INTEVAL = 10
-        self.STEP_RECORDPROGRESS = 10
+        self.STEP_RECORDPROGRESS = 1
         # 获得id
         self.NODEID = self.getid()
-        self.lastMsg = ''
+        self.lastServerResponse = ''
 
     def register(self):
         url = self.SERVER + self.URL_REGISTER
         p = {'pw': self.PASSWORD}
+        r = '服务器连接失败，无法注册。'
         try:
             r = requests.get(url, params=p).text
         except:
-            logging.info(u'无法连接服务器，节点退出。')
-            sys.exit()
+            logging.info(r)
+            self.lastServerResponse = r
+            return None
         if r.startswith("error"):
             logging.info(r)
-            sys.exit()
-
+            self.lastServerResponse = r
+            return None
+        self.lastServerResponse = r
         return r
 
     def nodeTaskConfirm(self, nodeTaskId):
@@ -151,7 +210,9 @@ class scanNode(object):
             r = requests.get(url, params=p).text
         except:
             logging.info(r % (nodeTaskId))
+            self.lastServerResponse = r
         logging.info(r)
+        self.lastServerResponse = r
 
     def isPluginExist(self, plugin):
         path = self.PLUGINDIR + plugin
@@ -172,6 +233,8 @@ class scanNode(object):
         except:
             logging.info(u'本地未找到id.txt，向服务器注册节点。')
             nodeId = self.register()
+            if nodeid == None:
+                return None
 
             f = open('id.txt', 'w')
             f.writelines(nodeId)
@@ -179,37 +242,47 @@ class scanNode(object):
             return nodeId
 
     def doTask(self):
-        task = None
         timer = threading.Timer(
-            0, func, (self.DBPATH, self.DOTASK_INTEVAL, self.STEP_RECORDPROGRESS, ""))
+            0, func, (self.DBPATH, self.DOTASK_INTEVAL, self.STEP_RECORDPROGRESS, False))
         timer.start()
 
     def pulse(self):
+        if self.NODEID == None:
+            return
+
         def func():
+            # 所以每个线程都必须新建一个对象
+            dbo = dboperator(self.DBPATH)
             url = self.SERVER + self.URL_PULSE
-            p = {'nodeID': self.NODEID, 'ipLeft': '0'}
+            ipLeft = dbo.getIpLeftAll()
+            p = {'nodeID': self.NODEID, 'ipLeft': ipLeft}
+            r = '无法连接服务器。'
             try:
                 r = requests.get(url, params=p).text
                 if r.startswith("error"):
                     logging.info(r)
+                    self.lastServerResponse = r
                     return
             except:
-                logging.info(u'服务器无响应，5秒后重试。')
+                # 判断是否与最后一条相等，不让一直刷屏
+                if self.lastServerResponse != r:
+                    logging.info(r)
+                    self.lastServerResponse = r
 
-            if r != None:
+            if r != '无法连接服务器。':
                 if r == 'no task now!':
-                    # 判断是否相等，不让一直刷屏
-                    if r != self.lastMsg:
-                        self.lastMsg = r
+                    # 判断是否与最后一条相等，不让一直刷屏
+                    if self.lastServerResponse != r:
                         logging.info(r)
+                        self.lastServerResponse = r
+
                 else:
-                    self.lastMsg = r
+                    self.lastServerResponse = r
                     nodeTasks = eval(r)
                     logging.info("接收到%d条任务。" % (len(nodeTasks)))
 
                     # SQLite objects created in a thread can only be used in that same thread.
-                    # 所以每个线程都必须新建一个对象
-                    dbo = dboperator(self.DBPATH)
+
                     for task in nodeTasks:
                         ntid = task[const.id]
                         plugin = task[const.plugin]
@@ -238,5 +311,5 @@ class scanNode(object):
 if __name__ == '__main__':
     node = scanNode()
     node.loadConfig()
-    node.pulse()
+    # node.pulse()
     node.doTask()
