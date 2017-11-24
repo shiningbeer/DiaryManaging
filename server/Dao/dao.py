@@ -230,7 +230,10 @@ class daoMongo(object):
         coll = self.db.nodeTasks
         return coll.update({const.taskId: taskID}, {"$set": {const.instruction: instruction}})
 
+    def modiNodeTask_instructionChanged_by_nodeID(self, nodeID, instructionChanged):
+        coll = self.db.nodeTasks
+        return coll.update({const.nodeId: nodeID}, {"$set": {const.instructionChanged: instructionChanged}})
+
     def modiNodeTask_instructionChanged_by_taskID(self, taskID, instructionChanged):
         coll = self.db.nodeTasks
-        oid = ObjectId(nodeTaskID)
         return coll.update({const.taskId: taskID}, {"$set": {const.instructionChanged: instructionChanged}})

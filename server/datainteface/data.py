@@ -33,6 +33,10 @@ def getTasks(req):
     tks = dao.getAllTasks(orderby)
     for d in tks:
         d[const.pubTime] = d[const.pubTime].strftime('%Y-%m-%d %H:%M')
+        if d[const.startTime] != None:
+            d[const.startTime] = d[const.startTime].strftime('%Y-%m-%d %H:%M')
+        if d[const.endTime] != None:
+            d[const.endTime] = d[const.endTime].strftime('%Y-%m-%d %H:%M')
         taskid = d[const.id]
         # 计算所有节点的ipfinished之和
         ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
@@ -61,7 +65,19 @@ def upDeleteTask(req):
     return HttpResponse("")
 
 
-def upStopTask(req):
+def upNewStatusForTask(req):
+    params = eval(req.GET['params'])
+    taskid = params['taskId']
+    status = int(params['status'])
+    dao.modiTask_status_by_taskID(taskid, status)
+    if status == statusOptions['执行']:
+        dao.modiNodeTask_instruction_by_taskID(
+            taskid, instructionOptions['执行'])
+    if status == statusOptions['暂停']:
+        dao.modiNodeTask_instruction_by_taskID(
+            taskid, instructionOptions['暂停'])
+    dao.modiNodeTask_instructionChanged_by_taskID(taskid, True)
+
     return HttpResponse("")
 
 

@@ -339,7 +339,6 @@ class scanNode(object):
 
                 else:
                     self.lasSyncResponse = r
-                    print r
                     instructionChangedTasks = eval(r)
                     logging.info("接收到%d条任务更新指示。" %
                                  (len(instructionChangedTasks)))

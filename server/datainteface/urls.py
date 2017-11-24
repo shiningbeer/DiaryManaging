@@ -10,7 +10,7 @@ urlpatterns = [
     url(r'^upNewTask/', data.upNewTask),
     url(r'^upDeleteTask/', data.upDeleteTask),
     url(r'^upStartTask/', data.upStartTask),
-    url(r'^upStopTask/', data.upStopTask),
+    url(r'^upNewStatusForTask/', data.upNewStatusForTask),
     # ip文件
     url(r'^getIpFiles/', data.getIpFiles),
     url(r'^upDeleteIpFile/', data.upDeleteIpFile),

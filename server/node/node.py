@@ -73,9 +73,6 @@ def syncTaskInfo(req):
 
     except:
         return HttpResponse("error:param error")
-    # dao.modiNodeTask_status_by_nodeTaskID(
-    #     '5a1429db5919ba5b98435f08', statusOptions['未开始'])
-    print "DDDDDDDDDDDDDDDDDDDD"
     if dao.getOneNode_by_nodeID(nodeID) != None:
         for item in ipFinishedList:
             nodeTaskId, ipFinished = item
@@ -89,7 +86,9 @@ def syncTaskInfo(req):
             atask = {}
             atask['nodeTaskID'] = task[const.id]
             atask['instruction'] = task[const.instruction]
-        result = json.dumps(instrucitonChangedTasks)
+            tasks.append(atask)
+        result = json.dumps(tasks)
+        dao.modiNodeTask_instructionChanged_by_nodeID(nodeID, False)
         return HttpResponse(result)
     else:
         return HttpResponse("error: nodeid not registered!")

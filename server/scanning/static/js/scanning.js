@@ -108,7 +108,7 @@ app.controller("boxCtrl", function ($scope, $http) {
 						$scope.tasks[i].iconStartTask = true;
 						break;
 					case 1:
-						$scope.tasks[i].status_string = "执行中";
+						$scope.tasks[i].status_string = "执行";
 						$scope.tasks[i].iconStartTask = false;
 						break;
 					case 2:
@@ -239,6 +239,7 @@ app.controller("boxCtrl", function ($scope, $http) {
 
 		//更改页面
 		$scope.tasks[index].status_string = '执行';
+		$scope.tasks[index].status = 1
 		$scope.tasks[index].iconStartTask = false;
 		var test = angular.element(document.getElementById('mb-startTask'));
 		test.modal('hide');
@@ -277,25 +278,41 @@ app.controller("boxCtrl", function ($scope, $http) {
 		//获得选中任务
 		$scope.choosedTaskIndex = index;
 		$scope.chosedTaskId = id;
-		//如果是play按钮，打开选择节点对话框
+		//如果是play按钮
 		if ($scope.tasks[index].iconStartTask) {
+			//如果是全新未开始的，，打开选择节点对话框
+			console.log($scope.tasks[index].status)
 			if ($scope.tasks[index].status == 0) {
 				$scope.getActiveNodes();
 				var test = angular.element(document.getElementById('mb-startTask'));
 				test.modal('show');
 			}
-			else if ($scope.tasks[index].status == 2) {
+			//否则就是暂停过后变成play的，那么按上去应该是继续
+			if ($scope.tasks[index].status == 2) {
 				$scope.tasks[index].iconStartTask = false
-				$scope.tasks[index].status_string = '执行中';
+				$scope.tasks[index].status_string = '执行';
+				$scope.tasks[index].status = 1
+				param = {}
+				param['taskId'] = id;
+				param['status'] = 1;
+				jsonstring = JSON.stringify(param);
+				url = "/data/upNewStatusForTask?params=" + jsonstring;
+				$http.get(url).success(function (data) { })
 			}
 		}
 
-		//如果是pause按钮，逻辑处理代码未写
+		//如果是pause按钮
 		else {
 			$scope.tasks[index].iconStartTask = true
-			$scope.tasks[index].status == 2
-			//todo:提交数据库
+			$scope.tasks[index].status = 2
 			$scope.tasks[index].status_string = '暂停';
+
+			param = {}
+			param['taskId'] = id;
+			param['status'] = 2;
+			jsonstring = JSON.stringify(param);
+			url = "/data/upNewStatusForTask?params=" + jsonstring;
+			$http.get(url).success(function (data) { })
 		}
 	}
 
