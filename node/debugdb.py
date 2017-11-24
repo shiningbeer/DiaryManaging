@@ -15,10 +15,10 @@ dbo = dboperator('test.db')
 #     print str(i) + '\r',
 #     sys.stdout.flush()
 #     sleep(1)
-x = dbo.getAllUnfinishedTasks()
-for i in x:
-    d, e = i
-    print d
-    print e
-u = dbo.getInstructionById('5a16e6ee33339d0b920fd8a3')
-print u
+x = dbo.getIpFinishedFromUnfinishedTasks()
+d = json.dumps(x)
+p = eval(d)
+for i in p:
+    h, g = i
+    print h
+    print g

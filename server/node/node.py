@@ -65,8 +65,34 @@ def pulse(req):
         return HttpResponse("error: nodeid not registered!")
 
 
-def taskProcessReport(req):
-    return HttpResponse("")
+def syncTaskInfo(req):
+    try:
+        jsonstr = req.GET['nodeTaskProcess']
+        nodeID = req.GET['nodeID']
+        ipFinishedList = eval(jsonstr)
+
+    except:
+        return HttpResponse("error:param error")
+    # dao.modiNodeTask_status_by_nodeTaskID(
+    #     '5a1429db5919ba5b98435f08', statusOptions['未开始'])
+    print "DDDDDDDDDDDDDDDDDDDD"
+    if dao.getOneNode_by_nodeID(nodeID) != None:
+        for item in ipFinishedList:
+            nodeTaskId, ipFinished = item
+            dao.modiNodeTask_ipFinished_by_nodeTaskID(nodeTaskId, ipFinished)
+        instrucitonChangedTasks = dao.getNodeTasks_instructionChanged_by_nodeID(
+            nodeID)
+        if len(instrucitonChangedTasks) == 0:
+            return HttpResponse("no task instruction changed!")
+        tasks = []
+        for task in instrucitonChangedTasks:
+            atask = {}
+            atask['nodeTaskID'] = task[const.id]
+            atask['instruction'] = task[const.instruction]
+        result = json.dumps(instrucitonChangedTasks)
+        return HttpResponse(result)
+    else:
+        return HttpResponse("error: nodeid not registered!")
 
 
 def nodeTaskConfirm(req):

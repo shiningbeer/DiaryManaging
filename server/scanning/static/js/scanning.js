@@ -86,10 +86,18 @@ app.controller("boxCtrl", function ($scope, $http) {
 		statusOptions = { "删除": -1, "未开始": 0, "执行": 1, "暂停": 2, "完成": 3 }
 		$http.get(url).success(function (data) {
 			$scope.tasks = data;
+			console.log(data)
 			for (var i = 0; i < $scope.tasks.length; i++) {
 				$scope.tasks[i].description_lite = $scope.tasks[i].description.substr(0, 4) + "...";
 				$scope.tasks[i].index = i;
-				$scope.tasks[i].iconChange = true;
+				$scope.tasks[i].iconStartTask = true;
+				if ($scope.tasks[i].ipTotal == null)
+					$scope.tasks[i].progress = 0;
+				else {
+					finished = parseFloat($scope.tasks[i].ipFinished).toFixed(3)
+					total = parseFloat($scope.tasks[i].ipTotal).toFixed(3)
+					$scope.tasks[i].progress = finished / total * 100
+				}
 
 				switch ($scope.tasks[i].status) {
 					case -1:
@@ -97,15 +105,18 @@ app.controller("boxCtrl", function ($scope, $http) {
 						break;
 					case 0:
 						$scope.tasks[i].status_string = "未开始";
+						$scope.tasks[i].iconStartTask = true;
 						break;
 					case 1:
 						$scope.tasks[i].status_string = "执行中";
+						$scope.tasks[i].iconStartTask = false;
 						break;
 					case 2:
 						$scope.tasks[i].status_string = "暂停";
 						break;
 					case 3:
 						$scope.tasks[i].status_string = "完成";
+
 						break;
 
 				}
@@ -155,13 +166,17 @@ app.controller("boxCtrl", function ($scope, $http) {
 	$scope.getActiveNodes = function () {
 		url = "/data/getActiveNodes";
 		$http.get(url).success(function (data) {
-			console.log(data)
+			$scope.activeNodes = []
 			for (var i = 0; i < data.length; i++) {
-
+				console.log(data)
 				var c = {};
 				c.id = data[i].id;
+				c.ipLeft = data[i].ipLeft;
+
 				c.checked = false;//设定初始选中状态为false
 				c.index = i
+				console.log(c)
+
 				$scope.activeNodes.push(c);
 
 			};
@@ -224,7 +239,7 @@ app.controller("boxCtrl", function ($scope, $http) {
 
 		//更改页面
 		$scope.tasks[index].status_string = '执行';
-		$scope.tasks[index].iconChange = false;
+		$scope.tasks[index].iconStartTask = false;
 		var test = angular.element(document.getElementById('mb-startTask'));
 		test.modal('hide');
 
@@ -263,15 +278,24 @@ app.controller("boxCtrl", function ($scope, $http) {
 		$scope.choosedTaskIndex = index;
 		$scope.chosedTaskId = id;
 		//如果是play按钮，打开选择节点对话框
-		if ($scope.tasks[index].iconChange) {
-			var test = angular.element(document.getElementById('mb-startTask'));
-			test.modal('show');
+		if ($scope.tasks[index].iconStartTask) {
+			if ($scope.tasks[index].status == 0) {
+				$scope.getActiveNodes();
+				var test = angular.element(document.getElementById('mb-startTask'));
+				test.modal('show');
+			}
+			else if ($scope.tasks[index].status == 2) {
+				$scope.tasks[index].iconStartTask = false
+				$scope.tasks[index].status_string = '执行中';
+			}
 		}
 
 		//如果是pause按钮，逻辑处理代码未写
 		else {
+			$scope.tasks[index].iconStartTask = true
+			$scope.tasks[index].status == 2
+			//todo:提交数据库
 			$scope.tasks[index].status_string = '暂停';
-			$scope.tasks[index].iconChange = true;
 		}
 	}
 

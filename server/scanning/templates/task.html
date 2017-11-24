@@ -99,7 +99,7 @@
                     <span class="list-group-item-heading" ng-bind='node.id'></span>
                     <span>】</span>
                     <span>ip队列：</span>
-                    <span class="list-group-item-text" ng-bind='node.ipWaitingNo'></span>
+                    <span class="list-group-item-text" ng-bind='node.ipLeft'></span>
 
                   </a>
 
@@ -436,18 +436,17 @@
                           <td class='time'>
                             <span class='time' ng-bind='task.pubTime'></span>
                             <button ng-click='startPauseTurn(task.id,task.index)' class="btn btn-success">
-                              <span ng-class="{true:'fa fa-play', false:'fa fa-pause'}[task.iconChange]"></span>
+                              <span ng-class="{true:'fa fa-play', false:'fa fa-pause'}[task.iconStartTask]"></span>
                             </button>
                             <button class="btn btn-danger">
                               <span class="fa fa-times" ng-click='upDeleteTask(task.id)'></span>
                             </button>
                           </td>
                           <td>
-                            <div class="progress-info">
-                              <div class="percent" ng-bind='task.progress'></div>
-                            </div>
-                            <div class="progress progress-striped progress-thin">
-                              <div class="progress-bar progress-bar-red" role="progressbar" style="width:{{taskProgress}}"></div>
+                            <div class="progress progress-striped">
+                              <div class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: {{taskProgress}}%;">
+
+                              </div>
                             </div>
 
                           </td>

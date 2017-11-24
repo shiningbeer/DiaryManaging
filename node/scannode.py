@@ -173,16 +173,22 @@ class scanNode(object):
         self.SERVER = 'http://127.0.0.1:8000'
         self.URL_REGISTER = '/node/register'
         self.URL_PULSE = '/node/pulse'
+        self.URL_SYNCTASKINFO = '/node/syncTaskInfo'
         self.URL_NODETASKCONFIRM = '/node/nodeTaskConfirm'
         self.PASSWORD = '123'
         self.DBPATH = 'test.db'
         self.PLUGINDIR = 'plugin/'
         self.PULSE_INTEVAL = 10
         self.DOTASK_INTEVAL = 10
+        self.SYNC_INTEVAL = 10
+        self.pulse_delay_after_start = 0
+        self.dotask_delay_after_start = 2
+        self.sync_delay_after_start = 4
         self.STEP_RECORDPROGRESS = 1
         # 获得id
         self.NODEID = self.getid()
-        self.lastServerResponse = ''
+        self.lasPulseResponse = ''
+        self.lasSyncResponse = ''
 
     def register(self):
         url = self.SERVER + self.URL_REGISTER
@@ -192,13 +198,11 @@ class scanNode(object):
             r = requests.get(url, params=p).text
         except:
             logging.info(r)
-            self.lastServerResponse = r
             return None
         if r.startswith("error"):
             logging.info(r)
-            self.lastServerResponse = r
             return None
-        self.lastServerResponse = r
+        logging.info('注册节点成功，获得id号：%s' % (r))
         return r
 
     def nodeTaskConfirm(self, nodeTaskId):
@@ -209,9 +213,7 @@ class scanNode(object):
             r = requests.get(url, params=p).text
         except:
             logging.info(r % (nodeTaskId))
-            self.lastServerResponse = r
         logging.info(r)
-        self.lastServerResponse = r
 
     def isPluginExist(self, plugin):
         path = self.PLUGINDIR + plugin
@@ -241,46 +243,47 @@ class scanNode(object):
             return nodeId
 
     def doTask(self):
+        # 启动2秒后执行
         timer = threading.Timer(
-            0, func, (self.DBPATH, self.DOTASK_INTEVAL, self.STEP_RECORDPROGRESS, False))
+            self.dotask_delay_after_start, func, (self.DBPATH, self.DOTASK_INTEVAL, self.STEP_RECORDPROGRESS, False))
         timer.start()
 
     def pulse(self):
+
         if self.NODEID == None:
             return
 
         def func():
-            # 所以每个线程都必须新建一个对象
+            # sqlite要求每个线程都必须新建一个对象
+            # SQLite objects created in a thread can only be used in that same thread.
             dbo = dboperator(self.DBPATH)
             url = self.SERVER + self.URL_PULSE
             ipLeft = dbo.getIpLeftAll()
             p = {'nodeID': self.NODEID, 'ipLeft': ipLeft}
-            r = '无法连接服务器。'
+            r = 'pulse线程：无法连接服务器。'
             try:
                 r = requests.get(url, params=p).text
                 if r.startswith("error"):
                     logging.info(r)
-                    self.lastServerResponse = r
+                    self.lasPulseResponse = r
                     return
             except:
                 # 判断是否与最后一条相等，不让一直刷屏
-                if self.lastServerResponse != r:
+                if self.lasPulseResponse != r:
                     logging.info(r)
-                    self.lastServerResponse = r
+                    self.lasPulseResponse = r
 
-            if r != '无法连接服务器。':
+            if r != 'pulse线程：无法连接服务器。':
                 if r == 'no task now!':
                     # 判断是否与最后一条相等，不让一直刷屏
-                    if self.lastServerResponse != r:
+                    if self.lasPulseResponse != r:
                         logging.info(r)
-                        self.lastServerResponse = r
+                        self.lasPulseResponse = r
 
                 else:
-                    self.lastServerResponse = r
+                    self.lasPulseResponse = r
                     nodeTasks = eval(r)
                     logging.info("接收到%d条任务。" % (len(nodeTasks)))
-
-                    # SQLite objects created in a thread can only be used in that same thread.
 
                     for task in nodeTasks:
                         ntid = task[const.id]
@@ -302,8 +305,53 @@ class scanNode(object):
                         self.nodeTaskConfirm(ntid)
             timer = threading.Timer(self.PULSE_INTEVAL, func)
             timer.start()
+        # 启动后直接执行
+        timer = threading.Timer(self.pulse_delay_after_start, func)
+        timer.start()
 
-        timer = threading.Timer(0, func)
+    def syncTaskInfo(self):
+        def func():
+            # sqlite要求每个线程都必须新建一个对象
+            # SQLite objects created in a thread can only be used in that same thread.
+            dbo = dboperator(self.DBPATH)
+            url = self.SERVER + self.URL_SYNCTASKINFO
+            ipFinishedList = dbo.getIpFinishedFromUnfinishedTasks()
+            jsonstr = json.dumps(ipFinishedList)
+            p = {'nodeID': self.NODEID, 'nodeTaskProcess': jsonstr}
+            r = '同步任务线程：无法连接服务器。'
+            print url
+            try:
+                r = requests.get(url, params=p).text
+                if r.startswith("error"):
+                    logging.info(r)
+                    self.lasSyncResponse = r
+                    return
+            except:
+                # 判断是否与最后一条相等，不让一直刷屏
+                if self.lasSyncResponse != r:
+                    logging.info(r)
+                    self.lasSyncResponse = r
+            if r != '同步任务线程：无法连接服务器。':
+                if r == 'no task instruction changed!':
+                    # 判断是否与最后一条相等，不让一直刷屏
+                    if self.lasPulseResponse != r:
+                        logging.info(r)
+                        self.lasPulseResponse = r
+
+                else:
+                    self.lasSyncResponse = r
+                    instructionChangedTasks = eval(r)
+                    logging.info("接收到%d条任务更新指示。" %
+                                 (len(instructionChangedTasks)))
+
+                    for task in instructionChangedTasks:
+                        ntid = task['nodeTaskID']
+                        instruction = task['instruction']
+                        dbo.updateInstructionById(ntid, instruction)  # 更新任务指示
+            timer = threading.Timer(self.SYNC_INTEVAL, func)
+            timer.start()
+        # 启动4后执行
+        timer = threading.Timer(self.sync_delay_after_start, func)
         timer.start()
 
 
@@ -312,3 +360,4 @@ if __name__ == '__main__':
     node.loadConfig()
     node.pulse()
     node.doTask()
+    node.syncTaskInfo()

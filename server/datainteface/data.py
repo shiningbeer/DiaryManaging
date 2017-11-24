@@ -33,6 +33,13 @@ def getTasks(req):
     tks = dao.getAllTasks(orderby)
     for d in tks:
         d[const.pubTime] = d[const.pubTime].strftime('%Y-%m-%d %H:%M')
+        taskid = d[const.id]
+        # 计算所有节点的ipfinished之和
+        ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
+        ipfinished_all = 0
+        for item in ipfinishedlist:
+            ipfinished_all = ipfinished_all + item[const.ipFinished]
+        d[const.ipFinished] = ipfinished_all
         result.append(d)
     return HttpResponse(json.dumps(result))
 
@@ -97,6 +104,10 @@ def upStartTask(req):
 
     # 将总数保存到这个任务
     dao.modiTask_ipTotal_by_taskID(taskId, totalsum)
+    # 改变status为执行
+    dao.modiTask_status_by_taskID(taskId, statusOptions['执行'])
+    # 记录开始时间
+    dao.modiTask_startTime_by_taskID(taskId, datetime.datetime.now())
     return HttpResponse("")
 
 
@@ -163,5 +174,6 @@ def getActiveNodes(request):
     for d in result:
         n = {}
         n['id'] = d[const.id]
+        n['ipLeft'] = d[const.ipLeft]
         nodes.append(n)
     return HttpResponse(json.dumps(nodes))

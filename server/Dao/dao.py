@@ -163,6 +163,16 @@ class daoMongo(object):
             nodeTasks.append(d)
         return nodeTasks
 
+    def getNodeTasks_all_by_taskID(self, task_id):
+        coll = self.db.nodeTasks
+        cur = coll.find({const.taskId: task_id})
+        nodeTasks = []
+        for d in cur:
+            d[const.id] = d[const.o_id].__str__()
+            d.pop(const.o_id)
+            nodeTasks.append(d)
+        return nodeTasks
+
     def getNodeTasks_unfetched_by_nodeID(self, nodeID):
         coll = self.db.nodeTasks
         cur = coll.find(

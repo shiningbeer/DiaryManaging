@@ -4,7 +4,7 @@ from . import node
 urlpatterns = [
     url(r'^register', node.register),
     url(r'^pulse', node.pulse),
-    url(r'^taskProcessReport', node.taskProcessReport),
+    url(r'^syncTaskInfo', node.syncTaskInfo),
     url(r'^nodeTaskConfirm', node.nodeTaskConfirm),
 
 
