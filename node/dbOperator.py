@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 import sqlite3
 
-statusOptions = {"未完成": 0, "完成": 1}
+statusOptions = {"未完成": 0, "完成": 1, "完成并已通知": 2}
 instructionOptions = {"删除": -1, "执行": 0, "暂停": 1}
 
 
@@ -73,6 +73,13 @@ class dboperator(object):
         self.__cur.execute("select id,ipFinished from " +
                            self.__tableName + " where status=" +
                            str(statusOptions["未完成"]) + " and instruction!=" +
+                           str(instructionOptions["删除"]))
+        return self.__cur.fetchall()
+
+    def getFinished_but_not_report_Tasks(self):
+        self.__cur.execute("select id from " +
+                           self.__tableName + " where status=" +
+                           str(statusOptions["完成"]) + " and instruction!=" +
                            str(instructionOptions["删除"]))
         return self.__cur.fetchall()
 

@@ -94,16 +94,16 @@ def caculateScaningIpRange(ipranges, lastip):
         # 找到lastip，返回子集
         return ipRangesForScan, ipOkCount
 
+# 这个线程函数一放在类里面就报错，exec语句无法执行，所以放外面了，拿scannode做参数传过来
 
-def func(dbpath, inteval, step, printed):
+
+def func(scannode, printed):
     '''
     任务执行线程函数，参数说明
-    dppath:数据库路径
-    inteval:定时器间隔
-    step：多少个ip扫描完记录一次进度
+    scannode:那个类
     printed:上次是否打印了no task信息，bool值
     '''
-    dbo = dboperator(dbpath)
+    dbo = dboperator(scannode.DBPATH)
     task = dbo.getOneTaskForExecute()
     if task == None:
         if printed != True:
@@ -111,7 +111,7 @@ def func(dbpath, inteval, step, printed):
             printed = True
         # 等一等 再执行
         timer = threading.Timer(
-            inteval, func, (dbpath, inteval, step, printed))
+            scannode.DOTASK_INTEVAL, func, (scannode, printed))
         timer.start()
     else:
         nodeTaskId, plugin, ipranges_str, iptotal = task  # 获取task各字段（task是个元组）
@@ -123,7 +123,7 @@ def func(dbpath, inteval, step, printed):
             logging.info(u'未找到相应插件。')
             # 等一等 再执行
             timer = threading.Timer(
-                inteval, func, (dbpath, inteval, step, printed))
+                scannode.DOTASK_INTEVAL, func, (scannode, printed))
             timer.start()
         printed = False
         logging.info("开始任务%s" % (nodeTaskId))
@@ -141,7 +141,7 @@ def func(dbpath, inteval, step, printed):
                 stepcounter = stepcounter + 1
                 ipOkCount = ipOkCount + 1
                 scanning_plugin.scan(str(IP(i)))
-                if stepcounter == step:
+                if stepcounter == scannode.STEP_RECORDPROGRESS:
                     dbo.updateLastIpById(nodeTaskId, str(IP(i)))  # 保存执行进度
                     dbo.updateIpFinishedById(nodeTaskId, ipOkCount)
                     print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(iptotal) + '\r',
@@ -153,7 +153,7 @@ def func(dbpath, inteval, step, printed):
                     if newInstruction != instructionOptions['执行']:
                         # 等1秒 再执行
                         timer = threading.Timer(
-                            1, func, (dbpath, inteval, step, printed))
+                            1, func, (scannode, printed))
                         timer.start()
                         # 本次任务退出
                         return
@@ -163,7 +163,7 @@ def func(dbpath, inteval, step, printed):
         logging.info("完成任务%s" % (nodeTaskId))
         # 完成一个后，直接执行下一个
         timer = threading.Timer(
-            0, func, (dbpath, inteval, step, printed))
+            0, func, (scannode, printed))
         timer.start()
 
 
@@ -175,20 +175,24 @@ class scanNode(object):
         self.URL_PULSE = '/node/pulse'
         self.URL_SYNCTASKINFO = '/node/syncTaskInfo'
         self.URL_NODETASKCONFIRM = '/node/nodeTaskConfirm'
+        self.URL_REPORTTASKCOMPLETE = '/node/reportTaskComplete'
         self.PASSWORD = '123'
         self.DBPATH = 'test.db'
         self.PLUGINDIR = 'plugin/'
         self.PULSE_INTEVAL = 10
         self.DOTASK_INTEVAL = 10
         self.SYNC_INTEVAL = 10
+        self.REPORTTASKCOMPLETE_INTEVAL = 10
         self.pulse_delay_after_start = 0
         self.dotask_delay_after_start = 2
         self.sync_delay_after_start = 4
+        self.report_delay_after_start = 6
         self.STEP_RECORDPROGRESS = 1
         # 获得id
         self.NODEID = self.getid()
         self.lasPulseResponse = ''
         self.lasSyncResponse = ''
+        self.lasReportResponse = ''
 
     def register(self):
         url = self.SERVER + self.URL_REGISTER
@@ -223,6 +227,43 @@ class scanNode(object):
             return False
     # 读取配置，如果有id则读出，如果没有则向服务器注册并保存
 
+    def reportTaskComplete(self, nodeTaskId):
+        def func():
+            dbo = dboperator(self.DBPATH)
+            ct = dbo.getFinished_but_not_report_Tasks()
+            # 如果新完成的=0，那么等10秒再看看有没有
+            if len(ct) == 0:
+                timer = threading.Timer(
+                    self.REPORTTASKCOMPLETE_INTEVAL, func)
+                timer.start()
+                return
+            else:  # 汇报
+                url = self.SERVER + self.URL_REPORTTASKCOMPLETE
+                p = {'id': nodeTaskId}
+                r = '报告任务%s时完成时无法连接服务器。'
+                try:
+                    r = requests.get(url, params=p).text
+                    if r.startswith("error"):
+                        if self.lasReportResponse != r:
+                            logging.info(r)
+                        self.lasReportResponse = r
+                        timer = threading.Timer(
+                            self.REPORTTASKCOMPLETE_INTEVAL, func)
+                        timer.start()
+                        return
+                except:
+                    # 判断是否与最后一条相等，不让一直刷屏
+                    if self.lasReportResponse != r:
+                        logging.info(r)
+                        self.lasReportResponse = r
+
+                if r != 'pulse线程：无法连接服务器。':
+                    if r == 'no task now!':
+                        # 判断是否与最后一条相等，不让一直刷屏
+                        if self.lasReportResponse != r:
+                            logging.info(r)
+                            self.lasReportResponse = r
+
     def getid(self):
         nodeId = ''
         try:
@@ -245,7 +286,7 @@ class scanNode(object):
     def doTask(self):
         # 启动2秒后执行
         timer = threading.Timer(
-            self.dotask_delay_after_start, func, (self.DBPATH, self.DOTASK_INTEVAL, self.STEP_RECORDPROGRESS, False))
+            self.dotask_delay_after_start, func, (self, False))
         timer.start()
 
     def pulse(self):
