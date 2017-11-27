@@ -53,7 +53,7 @@ def getTasks(req):
 
             d[const.ipFinished] = ipfinished_all
             # 根据finished和total是否相等判断任务是否完成，另外也可以根据每个子任务是否都完成来判断。
-            if d[const.ipTotal] == ipfinished_all | |complete:  # 如果相等，则更新
+            if d[const.ipTotal] == ipfinished_all or complete:  # 如果相等，则更新
                 d[const.status] = statusOptions['完成']
                 dao.modiTask_status_by_taskID(taskid, statusOptions['完成'])
                 d[const.ipFinished] = d[const.ipTotal]
