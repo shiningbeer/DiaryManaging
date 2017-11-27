@@ -19,7 +19,6 @@ class Const(object):
     def __init__(self):
         self.id = 'id'
         self.o_id = '_id'
-        self.name = 'name'
         self.ipFiles = 'ipFiles'
         self.user = 'user'
         self.description = 'description'
@@ -37,6 +36,7 @@ class Const(object):
         self.instructionChanged = 'instructionChanged'
         self.taskId = 'taskId'
         self.ipRange = 'ipRange'
+        self.taskName = 'taskName'
 
 
 const = Const()
@@ -62,7 +62,7 @@ class daoMongo(object):
     def addNewTask(self, name, user, description, ipfiles, plugin):
         coll = self.db.scanningTasks
         newtask = {}
-        newtask[const.name] = name
+        newtask[const.taskName] = name
         newtask[const.user] = user
         newtask[const.description] = description
         newtask[const.ipFiles] = ipfiles
@@ -195,10 +195,11 @@ class daoMongo(object):
             nodeTasks.append(d)
         return nodeTasks
 
-    def addNodeTask(self, taskId, nodeId, ipRange, plugin, ipTotal):
+    def addNodeTask(self, taskId, taskName, nodeId, ipRange, plugin, ipTotal):
         coll = self.db.nodeTasks
         nodeTask = {}
         nodeTask[const.taskId] = taskId
+        nodeTask[const.taskName] = taskName
         nodeTask[const.nodeId] = nodeId
         nodeTask[const.ipRange] = ipRange
         nodeTask[const.plugin] = plugin
@@ -211,10 +212,18 @@ class daoMongo(object):
         nodeTask[const.instructionChanged] = False
         return coll.insert_one(nodeTask)
 
+    def delNodeTask_status_is_deleted_by_nodeId(self, nodeid):
+        coll = self.db.nodeTasks
+        return coll.remove({const.instruction: instructionOptions['删除'], const.nodeId: nodeid})
+
     def modiNodeTask_status_by_nodeTaskID(self, nodeTaskID, status):
         coll = self.db.nodeTasks
         oid = ObjectId(nodeTaskID)
         return coll.update({const.o_id: oid}, {"$set": {const.status: status}})
+
+    def modiNodeTask_status_by_nodeID(self, nodeID, status):
+        coll = self.db.nodeTasks
+        return coll.update_many({const.nodeId: nodeID}, {"$set": {const.status: status}})
 
     def modiNodeTask_ipFinished_by_nodeTaskID(self, nodeTaskID, ipFinished):
         coll = self.db.nodeTasks
@@ -228,12 +237,12 @@ class daoMongo(object):
 
     def modiNodeTask_instruction_by_taskID(self, taskID, instruction):
         coll = self.db.nodeTasks
-        return coll.update({const.taskId: taskID}, {"$set": {const.instruction: instruction}})
+        return coll.update_many({const.taskId: taskID}, {"$set": {const.instruction: instruction}})
 
     def modiNodeTask_instructionChanged_by_nodeID(self, nodeID, instructionChanged):
         coll = self.db.nodeTasks
-        return coll.update({const.nodeId: nodeID}, {"$set": {const.instructionChanged: instructionChanged}})
+        return coll.update_many({const.nodeId: nodeID}, {"$set": {const.instructionChanged: instructionChanged}})
 
     def modiNodeTask_instructionChanged_by_taskID(self, taskID, instructionChanged):
         coll = self.db.nodeTasks
-        return coll.update({const.taskId: taskID}, {"$set": {const.instructionChanged: instructionChanged}})
+        return coll.update_many({const.taskId: taskID}, {"$set": {const.instructionChanged: instructionChanged}})

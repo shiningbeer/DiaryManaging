@@ -38,12 +38,22 @@ def getTasks(req):
         if d[const.endTime] != None:
             d[const.endTime] = d[const.endTime].strftime('%Y-%m-%d %H:%M')
         taskid = d[const.id]
+        # 如果标志已经完成，不用再计算ipfinished
+        if d[const.status] == statusOptions['完成']:
+            d[const.ipFinished] = d[const.ipTotal]
         # 计算所有节点的ipfinished之和
-        ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
-        ipfinished_all = 0
-        for item in ipfinishedlist:
-            ipfinished_all = ipfinished_all + item[const.ipFinished]
-        d[const.ipFinished] = ipfinished_all
+        else:
+            ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
+            ipfinished_all = 0
+            for item in ipfinishedlist:
+                print item[const.ipFinished]
+                ipfinished_all = ipfinished_all + item[const.ipFinished]
+            d[const.ipFinished] = ipfinished_all
+            # 根据finished和total是否相等判断任务是否完成，另外也可以根据每个子任务是否都完成来判断。
+            if d[const.ipTotal] == ipfinished_all:  # 如果相等，则更新
+                d[const.status] = statusOptions['完成']
+                dao.modiTask_status_by_taskID(taskid, statusOptions['完成'])
+
         result.append(d)
     return HttpResponse(json.dumps(result))
 
@@ -62,6 +72,9 @@ def upNewTask(req):
 def upDeleteTask(req):
     taskid = req.GET['taskid']
     dao.delTask_by_taskID(taskid)
+    # dao.modiTask_status_by_taskID(taskid, statusOptions['删除'])
+    dao.modiNodeTask_instruction_by_taskID(taskid, instructionOptions['删除'])
+    dao.modiNodeTask_instructionChanged_by_taskID(taskid, True)
     return HttpResponse("")
 
 
@@ -89,6 +102,7 @@ def upStartTask(req):
     task = dao.findTask_by_taskID(taskId)
     ipFiles = task[const.ipFiles]
     plugin = task[const.plugin]
+    task_name = task[const.taskName]
 
     # 读取ipfile
     lines = []
@@ -114,9 +128,9 @@ def upStartTask(req):
             sum = sum + item['count']
             ip_range.append(item['range'])
         ip_total = sum
-        plug_in = plugin
 
-        dao.addNodeTask(task_id, node_id, ip_range, plug_in, ip_total)
+        dao.addNodeTask(task_id, task_name, node_id,
+                        ip_range, plugin, ip_total)
 
     # 将总数保存到这个任务
     dao.modiTask_ipTotal_by_taskID(taskId, totalsum)
@@ -142,7 +156,7 @@ def uploadFileIP(request):
         if not myFile:
             return HttpResponse("no files for upload!")
         destination = open(os.path.join(os.path.split(os.path.realpath(__file__))[
-                           0] + "/targets", myFile.name), 'wb+')    # 打开特定的文件进行二进制的写操作
+            0] + "/targets", myFile.name), 'wb+')    # 打开特定的文件进行二进制的写操作
         for chunk in myFile.chunks():      # 分块写入文件
             destination.write(chunk)
         destination.close()
@@ -170,7 +184,7 @@ def uploadFilePlugin(request):
         if not myFile:
             return HttpResponse("no files for upload!")
         destination = open(os.path.join(os.path.split(os.path.realpath(__file__))[
-                           0] + "/myplugins", myFile.name), 'wb+')    # 打开特定的文件进行二进制的写操作
+            0] + "/myplugins", myFile.name), 'wb+')    # 打开特定的文件进行二进制的写操作
         for chunk in myFile.chunks():      # 分块写入文件
             destination.write(chunk)
         destination.close()

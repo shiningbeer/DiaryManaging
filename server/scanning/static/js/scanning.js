@@ -86,7 +86,7 @@ app.controller("boxCtrl", function ($scope, $http) {
 		statusOptions = { "删除": -1, "未开始": 0, "执行": 1, "暂停": 2, "完成": 3 }
 		$http.get(url).success(function (data) {
 			$scope.tasks = data;
-			console.log(data)
+
 			for (var i = 0; i < $scope.tasks.length; i++) {
 				$scope.tasks[i].description_lite = $scope.tasks[i].description.substr(0, 4) + "...";
 				$scope.tasks[i].index = i;
@@ -116,6 +116,9 @@ app.controller("boxCtrl", function ($scope, $http) {
 						break;
 					case 3:
 						$scope.tasks[i].status_string = "完成";
+						$scope.tasks[i].progress = 100;
+						$scope.tasks[i].completed = true;
+
 
 						break;
 
@@ -155,11 +158,19 @@ app.controller("boxCtrl", function ($scope, $http) {
 	};
 
 	$scope.upDeleteTask = function (taskid) {
-		url = "/data/upDeleteTask?taskid=" + taskid;
+		if ($scope.taskToDel_id == null)
+			return;
+		url = "/data/upDeleteTask?taskid=" + $scope.taskToDel_id;
 		$http.get(url).success(function (data) {
 			$scope.getTasks();
 		});
 
+	}
+	$scope.confirm_delTask = function (taskid) {
+		$scope.taskToDel_id = taskid
+
+		var test = angular.element(document.getElementById('mb-deltask'));
+		test.toggleClass("open");
 	}
 
 	//-------nodes相关---------------------------

@@ -113,6 +113,7 @@ def func(scannode, printed):
         timer = threading.Timer(
             scannode.DOTASK_INTEVAL, func, (scannode, printed))
         timer.start()
+        return
     else:
         nodeTaskId, plugin, ipranges_str, iptotal = task  # 获取task各字段（task是个元组）
         # 把后缀名.py去掉
@@ -227,26 +228,32 @@ class scanNode(object):
             return False
     # 读取配置，如果有id则读出，如果没有则向服务器注册并保存
 
-    def reportTaskComplete(self, nodeTaskId):
+    def reportTaskComplete(self):
         def func():
             dbo = dboperator(self.DBPATH)
-            ct = dbo.getFinished_but_not_report_Tasks()
+            ctl = dbo.getFinished_but_not_report_Tasks()
             # 如果新完成的=0，那么等10秒再看看有没有
-            if len(ct) == 0:
+            r = "没有新任务完成"
+            if len(ctl) == 0:
+                if self.lasReportResponse != r:
+                    logging.info(r)
+                    self.lasReportResponse = r
                 timer = threading.Timer(
                     self.REPORTTASKCOMPLETE_INTEVAL, func)
                 timer.start()
                 return
             else:  # 汇报
+                jsonstr = json.dumps(ctl)
                 url = self.SERVER + self.URL_REPORTTASKCOMPLETE
-                p = {'id': nodeTaskId}
-                r = '报告任务%s时完成时无法连接服务器。'
+                p = {'nodeID': self.NODEID, 'completeList': jsonstr}
+                r = '报告任务完成时无法连接服务器。'
                 try:
                     r = requests.get(url, params=p).text
                     if r.startswith("error"):
                         if self.lasReportResponse != r:
                             logging.info(r)
                         self.lasReportResponse = r
+                        # 如果回复错误，则10秒后再试
                         timer = threading.Timer(
                             self.REPORTTASKCOMPLETE_INTEVAL, func)
                         timer.start()
@@ -256,13 +263,24 @@ class scanNode(object):
                     if self.lasReportResponse != r:
                         logging.info(r)
                         self.lasReportResponse = r
+                        # 如果连接出错，则10秒后再试
+                        timer = threading.Timer(
+                            self.REPORTTASKCOMPLETE_INTEVAL, func)
+                        timer.start()
+                        return
 
-                if r != 'pulse线程：无法连接服务器。':
-                    if r == 'no task now!':
-                        # 判断是否与最后一条相等，不让一直刷屏
-                        if self.lasReportResponse != r:
-                            logging.info(r)
-                            self.lasReportResponse = r
+                if r != '报告任务完成时无法连接服务器。':
+                    # 如果是正确回复，则将本地完成的任务的Status从完成改为完成且已通知
+                    for nodetaskid in completeTasks:
+                        dbo.updateStatusById(
+                            nodetaskid, statusOptions['完成并已通知'])
+                    logging.info(r)
+                    timer = threading.Timer(
+                        self.REPORTTASKCOMPLETE_INTEVAL, func)
+                    timer.start()
+        timer = threading.Timer(
+            self.report_delay_after_start, func)
+        timer.start()
 
     def getid(self):
         nodeId = ''
@@ -305,8 +323,11 @@ class scanNode(object):
             try:
                 r = requests.get(url, params=p).text
                 if r.startswith("error"):
-                    logging.info(r)
-                    self.lasPulseResponse = r
+                    if self.lasPulseResponse != r:
+                        logging.info(r)
+                        self.lasPulseResponse = r
+                    timer = threading.Timer(self.PULSE_INTEVAL, func)
+                    timer.start()
                     return
             except:
                 # 判断是否与最后一条相等，不让一直刷屏
@@ -315,7 +336,7 @@ class scanNode(object):
                     self.lasPulseResponse = r
 
             if r != 'pulse线程：无法连接服务器。':
-                if r == 'no task now!':
+                if r == 'from server: no task now!':
                     # 判断是否与最后一条相等，不让一直刷屏
                     if self.lasPulseResponse != r:
                         logging.info(r)
@@ -356,7 +377,7 @@ class scanNode(object):
             # SQLite objects created in a thread can only be used in that same thread.
             dbo = dboperator(self.DBPATH)
             url = self.SERVER + self.URL_SYNCTASKINFO
-            ipFinishedList = dbo.getIpFinishedFromUnfinishedTasks()
+            ipFinishedList = dbo.getIpFinishedFromNotFinisedAndNotifiedTasks()
             jsonstr = json.dumps(ipFinishedList)
             p = {'nodeID': self.NODEID, 'nodeTaskProcess': jsonstr}
             r = '同步任务线程：无法连接服务器。'
@@ -372,7 +393,7 @@ class scanNode(object):
                     logging.info(r)
                     self.lasSyncResponse = r
             if r != '同步任务线程：无法连接服务器。':
-                if r == 'no task instruction changed!':
+                if r == 'from server:no task instruction changed!':
                     # 判断是否与最后一条相等，不让一直刷屏
                     if self.lasSyncResponse != r:
                         logging.info(r)
@@ -402,3 +423,4 @@ if __name__ == '__main__':
     node.pulse()
     node.doTask()
     node.syncTaskInfo()
+    node.reportTaskComplete()

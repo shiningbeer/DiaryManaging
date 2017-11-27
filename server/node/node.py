@@ -38,7 +38,7 @@ def pulse(req):
         ipLeft = int(req.GET['ipLeft'])
         nodeID = req.GET['nodeID']
     except:
-        return HttpResponse("error:param error")
+        return HttpResponse("error:pulse param error")
     # dao.modiNodeTask_status_by_nodeTaskID(
     #     '5a1429db5919ba5b98435f08', statusOptions['未开始'])
     if dao.getOneNode_by_nodeID(nodeID) != None:
@@ -46,7 +46,7 @@ def pulse(req):
         dao.modiNode_ipLeft_by_nodeID(nodeID, ipLeft)
         unfetchedTasks = dao.getNodeTasks_unfetched_by_nodeID(nodeID)
         if len(unfetchedTasks) == 0:
-            return HttpResponse("no task now!")
+            return HttpResponse("from server: no task now!")
         for task in unfetchedTasks:
             # task[const.startTime] = task[const.startTime].strftime(
             #     '%Y-%m-%d %H:%M')
@@ -72,7 +72,7 @@ def syncTaskInfo(req):
         ipFinishedList = eval(jsonstr)
 
     except:
-        return HttpResponse("error:param error")
+        return HttpResponse("error:sync param error")
     if dao.getOneNode_by_nodeID(nodeID) != None:
         for item in ipFinishedList:
             nodeTaskId, ipFinished = item
@@ -80,7 +80,7 @@ def syncTaskInfo(req):
         instrucitonChangedTasks = dao.getNodeTasks_instructionChanged_by_nodeID(
             nodeID)
         if len(instrucitonChangedTasks) == 0:
-            return HttpResponse("no task instruction changed!")
+            return HttpResponse("from server:no task instruction changed!")
         tasks = []
         for task in instrucitonChangedTasks:
             atask = {}
@@ -88,7 +88,7 @@ def syncTaskInfo(req):
             atask['instruction'] = task[const.instruction]
             tasks.append(atask)
         result = json.dumps(tasks)
-        dao.modiNodeTask_instructionChanged_by_nodeID(nodeID, False)
+
         return HttpResponse(result)
     else:
         return HttpResponse("error: nodeid not registered!")
@@ -96,8 +96,37 @@ def syncTaskInfo(req):
 
 def nodeTaskConfirm(req):
     try:
-        nodeTaskid = req.GET['id']
+        nodeid = req.GET['nodeid']
     except:
-        return HttpResponse("error:param error when confirm task")
-    dao.modiNodeTask_status_by_nodeTaskID(nodeTaskid, statusOptions['执行'])
-    return HttpResponse("task:" + nodeTaskid + " has been confirmed!")
+        return HttpResponse("error:confirm param error")
+    dao.modiNodeTask_status_by_nodeID(nodeid, statusOptions['执行'])
+    return HttpResponse("task has been confirmed!")
+
+
+def instructionChangedConfirm(req):
+    try:
+        nodeID = req.GET['nodeid']
+    except:
+        return HttpResponse("error:confirm param error")
+    print dao.modiNodeTask_instructionChanged_by_nodeID(nodeID, False)
+    dao.delNodeTask_status_is_deleted_by_nodeId(nodeID)
+    return HttpResponse("from server: instruction changed has been confirmed!")
+
+
+def reportTaskComplete(req):
+    try:
+        jsonstr = req.GET['completeList']
+        nodeID = req.GET['nodeID']
+        completeList = eval(jsonstr)
+
+    except:
+        return HttpResponse("error:report param error")
+    if dao.getOneNode_by_nodeID(nodeID) != None:
+        for nodetaskid in completeList:
+            dao.modiNodeTask_status_by_nodeTaskID(
+                nodetaskid, statusOptions['完成'])
+            # 因为node端不同
+
+        return HttpResponse("from server: server received new task complete message.")
+    else:
+        return HttpResponse("error: nodeid not registered!")

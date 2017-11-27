@@ -20,6 +20,7 @@ class dboperator(object):
         self.__cur.execute(
             "create table if not exists " + self.__tableName + " (" +
             "id text primary key, " +
+            "taskName text, " +
             "ipRange text, " +
             "plugin text, " +
             "startTime timestamp not null default (datetime('now','localtime')), " +
@@ -38,12 +39,12 @@ class dboperator(object):
         self.__cur.close()
         self.__con.close()
 
-    def insertTask(self, id, ipRange, plugin, ipTotal):
+    def insertTask(self, ntid, taskName, ipRange, plugin, ipTotal):
         '''新建一条记录'''
         # 依次插入字段，startTime、endTime为空，ipFinished为0,status为未完成，instruciton为执行，其它为参数
         self.__cur.execute(
-            "insert into " + self.__tableName + "(id,ipRange,plugin,ipTotal,ipFinished,status,instruction) values('" +
-            id + "','" + ipRange + "','" + plugin + "'," + str(ipTotal) + ",0," + str(statusOptions["未完成"]) +
+            "insert into " + self.__tableName + "(id,taskName,ipRange,plugin,ipTotal,ipFinished,status,instruction) values('" +
+            ntid + "','" + taskName + "','" + ipRange + "','" + plugin + "'," + str(ipTotal) + ",0," + str(statusOptions["未完成"]) +
             "," + str(instructionOptions['执行']) + ")")
         self.__con.commit()
 
@@ -69,10 +70,16 @@ class dboperator(object):
         else:
             return False
 
-    def getIpFinishedFromUnfinishedTasks(self):
+    def getIpFinishedFromNotFinisedAndNotifiedTasks(self):
+        '''
+        搜索未完成和完成的，
+        因为不同线程的时间差，执行任务完成之后，改了status=完成，此时sycn还没运行，也就是最后的ipfinished没同步上去。
+        所以完成的也要汇报，后面完成的经过reportcomlete线程之后变成完成并已通知，这个就不汇报了。
+        '''
         self.__cur.execute("select id,ipFinished from " +
                            self.__tableName + " where status=" +
-                           str(statusOptions["未完成"]) + " and instruction!=" +
+                           str(statusOptions["未完成"]) + " or status=" +
+                           str(statusOptions["完成"]) + " and instruction!=" +
                            str(instructionOptions["删除"]))
         return self.__cur.fetchall()
 
@@ -81,11 +88,16 @@ class dboperator(object):
                            self.__tableName + " where status=" +
                            str(statusOptions["完成"]) + " and instruction!=" +
                            str(instructionOptions["删除"]))
-        return self.__cur.fetchall()
+        ctl = self.__cur.fetchall()
+        completeTasks = []
+        for item in ctl:
+            ct, = item
+            completeTasks.append(ct)
+        return completeTasks
 
     def getOneTaskForExecute(self):
         '''获取一条status="未完成"且instruction="执行"的记录'''
-        self.__cur.execute("select id, plugin,ipRange,ipTotal from " +
+        self.__cur.execute("select id, taskName,plugin,ipRange,ipTotal from " +
                            self.__tableName + " where status=" +
                            str(statusOptions["未完成"]) + " and instruction=" +
                            str(instructionOptions["执行"]))
@@ -94,7 +106,8 @@ class dboperator(object):
     def getIpLeftAll(self):
         '''获取所有status="未完成"的iptotal和ipfinished之差'''
         self.__cur.execute("select ipTotal,ipFinished from " +
-                           self.__tableName + " where status=" + str(statusOptions["未完成"]))
+                           self.__tableName + " where status=" + str(statusOptions["未完成"]) +
+                           " and instruction!=" + str(instructionOptions['删除']))
         result = 0
         nextRow = True
         while nextRow:
