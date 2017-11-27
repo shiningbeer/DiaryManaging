@@ -45,14 +45,18 @@ def getTasks(req):
         else:
             ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
             ipfinished_all = 0
+            complete = True
             for item in ipfinishedlist:
-                print item[const.ipFinished]
                 ipfinished_all = ipfinished_all + item[const.ipFinished]
+                if item[const.status] != statusOptions['完成']:
+                    complete = False
+
             d[const.ipFinished] = ipfinished_all
             # 根据finished和total是否相等判断任务是否完成，另外也可以根据每个子任务是否都完成来判断。
-            if d[const.ipTotal] == ipfinished_all:  # 如果相等，则更新
+            if d[const.ipTotal] == ipfinished_all | |complete:  # 如果相等，则更新
                 d[const.status] = statusOptions['完成']
                 dao.modiTask_status_by_taskID(taskid, statusOptions['完成'])
+                d[const.ipFinished] = d[const.ipTotal]
 
         result.append(d)
     return HttpResponse(json.dumps(result))
