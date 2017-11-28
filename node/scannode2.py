@@ -97,6 +97,10 @@ def caculateScaningIpRange(ipranges, lastip):
         return ipRangesForScan, ipOkCount
 
 
+def scanFunc(pluginscanfunc, ip):
+    pluginscanfunc(ip)
+
+
 def taskfunc(scannode, printed):
     '''
     ### task线程函数，定时从数据库读取未完成任务，设置好参数后调用插件执行任务
@@ -155,7 +159,6 @@ def taskfunc(scannode, printed):
             stepcounter = stepcounter + 1
             ipOkCount = ipOkCount + 1
             result = scanning_plugin.scan(str(IP(i)))
-            print result
             f.writelines(json.dumps(result) + '\n')
             f.flush()
             if stepcounter == scannode.STEP_RECORDPROGRESS:
