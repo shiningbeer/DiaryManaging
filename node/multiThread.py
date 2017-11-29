@@ -41,22 +41,25 @@ class multiThread(object):
 
     def getAllThreadProcess(self):
         self.lock.acquire()
-        print self.queue
+        result=[]
+        for item in self.queue:
+            result.append(item["params"])
         self.lock.release()
-
-    def dispatch(self, args_runFunc):
+        return result
+    def dispatch(self, args_runFunc,args_lock):
         '''
         - summary 多线程任务分发
         - 参数说明：
-        - args_runFunc：线程要执行的函数的参数元组
+         - args_runFunc：thread_func函数的参数元组
+         - args_lock：thread_func_access_lock函数的参数元组
         '''
 
-        def threadFunc(queueIndex, args_runFunc):
+        def threadFunc(queueIndex, args_runFunc,args_lock):
             self.queue[queueIndex]['params'] = args_runFunc
             r = self.runFunc(*args_runFunc)  # 执行函数
             # print str(args_runFunc) + '退出了'
             self.lock.acquire()
-            self.thread_func_access_lock(r,*args_runFunc)
+            self.thread_func_access_lock(r,*args_lock)
             self.threadCount = self.threadCount - 1  # 退出时，线程数量-1
             self.threadFull = False  # 退出了一个，线程肯定不满了
             # 退出时设置队列可用，执行进度记录一下
@@ -79,29 +82,30 @@ class multiThread(object):
         self.queue[queueIndex]['available'] = False
         # 将队列index传给线程，使得它可以在线程退出时设置当前队列执行到哪里
         t = threading.Thread(
-            target=threadFunc, args=(queueIndex, args_runFunc))
+            target=threadFunc, args=(queueIndex, args_runFunc,args_lock))
         t.start()
 
 
 if __name__ == '__main__':
-    d = []
-
+    #例子
     def scan(x, y):
         # print '我是' + str(x) + ',' + str(y)
         # pass
         sleep(3.01 / (y + 1))
         return x + y
 
-    def record(x,y,z):
-        pp = (y, z, x)
-        d.append(pp)
+    def record(r,f,i,y):
+        line=str(i)+','+str(y)+":"+str(r)+'\n'
+        f.writelines(line)
+        f.flush()
 
     dp = multiThread(5, scan, record)
-
+    f = open('aaaa.txt', 'a')
     for i in range(0, 10):
         for y in range(0, 10):
             while dp.threadFull:
                 sleep(0.1)
-            dp.dispatch((i, y))
-    sleep(10)
-    print d
+            dp.dispatch((i, y),(f,i,y))
+    sleep(3)
+    f.close()
+    print "ok"

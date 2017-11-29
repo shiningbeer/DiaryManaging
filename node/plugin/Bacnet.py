@@ -3,5 +3,5 @@ from time import sleep
 
 
 def scan(ip):
-
-    sleep(1)
+    print ip
+    return ip

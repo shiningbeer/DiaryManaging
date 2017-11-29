@@ -7,6 +7,7 @@ import datetime
 import sys
 import threading
 from dbOperator import dboperator, statusOptions, instructionOptions
+from multiThread import multiThread
 from serverCon import serverCon
 import logging
 from IPy import IP
@@ -97,10 +98,9 @@ def caculateScaningIpRange(ipranges, lastip):
         return ipRangesForScan, ipOkCount
 
 
-def scanFunc(pluginscanfunc, ip):
-    pluginscanfunc(ip)
-
-
+def recordResult(result,f):
+    f.writelines(json.dumps(result) + '\n')
+    f.flush()
 def taskfunc(scannode, printed):
     '''
     ### task线程函数，定时从数据库读取未完成任务，设置好参数后调用插件执行任务
@@ -110,7 +110,7 @@ def taskfunc(scannode, printed):
     - 这个线程函数一放在类里面就报错，exec语句无法执行，所以放外面了，拿scannode做参数传过来
     '''
     tag = 'task线程->'
-    dbo = dboperator(scannode.DBPATH)
+    dbo = dboperator(scannode.dbpath)
     # 先删除标记成删除的任务
 
     task = dbo.getOneTaskForExecute()
@@ -121,7 +121,7 @@ def taskfunc(scannode, printed):
             logging.info(tag + r)
             printed = r
         timer = threading.Timer(
-            scannode.DOTASK_INTEVAL, taskfunc, (scannode, printed))
+            scannode.do_task_inteval, taskfunc, (scannode, printed))
         timer.start()
         return
     # 如果有任务
@@ -138,7 +138,7 @@ def taskfunc(scannode, printed):
             logging.info(tag + r + plugin)
             printed = r
         timer = threading.Timer(
-            scannode.DOTASK_INTEVAL, taskfunc, (scannode, printed))
+            scannode.do_task_inteval, taskfunc, (scannode, printed))
         timer.start()
         return
     r = "开始任务%s" % (nodeTaskId)
@@ -151,6 +151,9 @@ def taskfunc(scannode, printed):
     ipRangesForScan, ipOkCount = caculateScaningIpRange(
         ipranges, lastip)
     stepcounter = 0  # 每满step个存储一次进度
+    # 构造multiThread的一个参数，详见multiThread类的说明
+
+    dp=multiThread(scannode.thread_count,scanning_plugin.scan,recordResult)
     f = open('result/' + taskName + '_' + nodeTaskId + '.txt', 'a')
     for iprange in ipRangesForScan:
         start, end = iprange
@@ -158,11 +161,20 @@ def taskfunc(scannode, printed):
             # 计数，到step个时，存储扫描到哪里,扫描了几个
             stepcounter = stepcounter + 1
             ipOkCount = ipOkCount + 1
-            result = scanning_plugin.scan(str(IP(i)))
-            f.writelines(json.dumps(result) + '\n')
-            f.flush()
-            if stepcounter == scannode.STEP_RECORDPROGRESS:
-                dbo.updateLastIpById(nodeTaskId, str(IP(i)))  # 保存执行进度
+            p=str(IP(i))
+            dp.dispatch((p,),(f,))
+            if stepcounter == scannode.step_recoard_progress:
+                r=dp.getAllThreadProcess()#获取每个线程执行到哪
+                #取得最小
+                p,=r[0]
+                least=IP(p).int()
+                for item in r:
+                    p,=item
+                    x=IP(p).int()
+                    if x<least:
+                        least=x
+                str_least=str(IP(least))
+                dbo.updateLastIpById(nodeTaskId, str_least)  # 保存执行进度
                 dbo.updateIpFinishedById(nodeTaskId, ipOkCount)
                 print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(iptotal) + '\r',
                 sys.stdout.flush()
@@ -192,17 +204,18 @@ class scanNode(object):
 
     def __init__(self):
         self.serverCon = serverCon()
-        self.DBPATH = 'test.db'
-        self.PLUGINDIR = 'plugin/'
-        self.PULSE_INTEVAL = 10
-        self.DOTASK_INTEVAL = 10
-        self.SYNC_INTEVAL = 10
-        self.REPORTTASKCOMPLETE_INTEVAL = 10
+        self.dbpath = 'test.db'
+        self.plugin_dir = 'plugin/'
+        self.pulse_inteval = 10
+        self.do_task_inteval = 10
+        self.sync_inteval = 10
+        self.report_inteval = 10
         self.pulse_delay_after_start = 0
         self.dotask_delay_after_start = 2
         self.sync_delay_after_start = 4
         self.report_delay_after_start = 6
-        self.STEP_RECORDPROGRESS = 1
+        self.step_recoard_progress = 50
+        self.thread_count=5
         # 获得id
         self.nodeId = self.getid()
         if self.nodeId == None:
@@ -230,7 +243,7 @@ class scanNode(object):
             return nodeId
 
     def isPluginExist(self, plugin):
-        path = self.PLUGINDIR + plugin
+        path = self.plugin_dir + plugin
         if os.path.exists(path):
             return True
         else:
@@ -246,12 +259,12 @@ class scanNode(object):
             '''
             # sqlite要求每个线程都必须新建一个对象
             # SQLite objects created in a thread can only be used in that same thread.
-            dbo = dboperator(self.DBPATH)
+            dbo = dboperator(self.dbpath)
             ipLeft = dbo.getIpLeftAll()
             nodeTasks = self.serverCon.pulse(ipLeft)
             # 未获得任务，则定时再次执行
             if nodeTasks == None:
-                timer = threading.Timer(self.PULSE_INTEVAL, pulseFunc)
+                timer = threading.Timer(self.pulse_inteval, pulseFunc)
                 timer.start()
                 return
             # 获得任务，保存后定时再执行
@@ -275,7 +288,7 @@ class scanNode(object):
             logging.info("已保存任务，向服务器发送确认信息。")
             self.serverCon.nodeTaskConfirm()
             # 定时下次执行
-            timer = threading.Timer(self.PULSE_INTEVAL, pulseFunc)
+            timer = threading.Timer(self.pulse_inteval, pulseFunc)
             timer.start()
 
         # 执行pulse
@@ -290,13 +303,13 @@ class scanNode(object):
             '''
             sync线程函数，定时向服务器发送任务进度，得到返回的有任务指令修改的任务
             '''
-            dbo = dboperator(self.DBPATH)
+            dbo = dboperator(self.dbpath)
             ipFinishedList = dbo.getIpFinishedFromNotFinisedAndNotifiedTasks()
             instructionChangedTasks = self.serverCon.syncTaskInfo(
                 ipFinishedList)
             # 未获得任务，则定时再次执行
             if instructionChangedTasks == None:
-                timer = threading.Timer(self.SYNC_INTEVAL, syncfunc)
+                timer = threading.Timer(self.sync_inteval, syncfunc)
                 timer.start()
                 return
             # 获得任务，保存后定时再执行
@@ -306,7 +319,7 @@ class scanNode(object):
                 dbo.updateInstructionById(ntid, instruction)  # 更新任务指示
             # 向服务器确认收到
             self.serverCon.instructionChangedConfirm()
-            timer = threading.Timer(self.SYNC_INTEVAL, syncfunc)
+            timer = threading.Timer(self.sync_inteval, syncfunc)
             timer.start()
         # 执行
         timer = threading.Timer(self.sync_delay_after_start, syncfunc)
@@ -320,13 +333,13 @@ class scanNode(object):
             '''
             report线程函数，定时将已经完成的任务报告给服务器，收到服务器确认消息后保存
             '''
-            dbo = dboperator(self.DBPATH)
+            dbo = dboperator(self.dbpath)
             completeTasks = dbo.getFinished_but_not_report_Tasks()
             success = self.serverCon.reportTaskComplete(completeTasks)
             # 报告不成功，则定时再次执行
             if success == False:
                 timer = threading.Timer(
-                    self.REPORTTASKCOMPLETE_INTEVAL, reportfunc)
+                    self.report_inteval, reportfunc)
                 timer.start()
                 return
             # 报告成功，则将本地完成的任务的Status从完成改为完成且已通知
@@ -334,7 +347,7 @@ class scanNode(object):
                 dbo.updateStatusById(
                     nodetaskid, statusOptions['完成并已通知'])
             timer = threading.Timer(
-                self.REPORTTASKCOMPLETE_INTEVAL, reportfunc)
+                self.report_inteval, reportfunc)
             timer.start()
         # 执行
         timer = threading.Timer(

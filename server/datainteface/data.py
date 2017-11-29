@@ -46,6 +46,9 @@ def getTasks(req):
             ipfinishedlist = dao.getNodeTasks_all_by_taskID(taskid)
             ipfinished_all = 0
             complete = True
+            if len(ipfinishedlist)==0:
+                complete=False
+
             for item in ipfinishedlist:
                 ipfinished_all = ipfinished_all + item[const.ipFinished]
                 if item[const.status] != statusOptions['完成']:
