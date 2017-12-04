@@ -11,6 +11,7 @@ from multiThread import multiThread
 from serverCon import serverCon
 import logging
 from IPy import IP
+from time import sleep
 # 设置默认的level为DEBUG
 # 设置log的格式
 logging.basicConfig(
@@ -163,6 +164,7 @@ def taskfunc(scannode, printed):
             ipOkCount = ipOkCount + 1
             p=str(IP(i))
             dp.dispatch((p,),(f,))
+            #个数达到指定个数后保存执行进度
             if stepcounter == scannode.step_recoard_progress:
                 r=dp.getAllThreadProcess()#获取每个线程执行到哪
                 #取得最小
@@ -176,20 +178,22 @@ def taskfunc(scannode, printed):
                 str_least=str(IP(least))
                 dbo.updateLastIpById(nodeTaskId, str_least)  # 保存执行进度
                 dbo.updateIpFinishedById(nodeTaskId, ipOkCount)
+                stepcounter = 0
                 print '任务%s扫描完成进度：' % (nodeTaskId) + str(ipOkCount) + '/' + str(iptotal) + '\r',
                 sys.stdout.flush()
-                stepcounter = 0
-                # 查看任务的指令是否变化
-                newInstruction = dbo.getInstructionById(nodeTaskId)
-                # 如果指令不是执行
-                if newInstruction != instructionOptions['执行']:
-                    # 等1秒 再执行
-                    timer = threading.Timer(
-                        1, taskfunc, (scannode, printed))
-                    timer.start()
-                    # 本次任务退出
-                    f.close()
-                    return
+            
+            # 查看任务的指令是否变化
+            newInstruction = dbo.getInstructionById(nodeTaskId)
+            # 如果指令不是执行
+            if newInstruction != instructionOptions['执行']:
+                # 等5秒 再执行
+                timer = threading.Timer(
+                    5, taskfunc, (scannode, printed))
+                timer.start()
+                # 本次任务退出,等5秒，确保线程都结束了，再关闭文件
+                sleep(5)
+                f.close()
+                return
     f.close()
     dbo.updateStatusById(nodeTaskId, statusOptions['完成'])
     # todo:删除lastip表中的这个id记录，因为已经完成了
