@@ -13,7 +13,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(message)s"
 )
-
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 default_encoding = 'utf-8'
 if sys.getdefaultencoding() != default_encoding:
     reload(sys)
